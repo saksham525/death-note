@@ -1,23 +1,21 @@
 import React, { useRef, useEffect, useCallback } from 'react'
 import { Canvas, useFrame } from '@react-three/fiber'
 import { useGLTF, Environment } from '@react-three/drei'
-import { gsap } from 'gsap'
-import { ScrollTrigger } from 'gsap/ScrollTrigger'
 import * as THREE from 'three'
-import BookSection1 from './Booksection1'
-import BookSection2 from './Booksection2'
-
-gsap.registerPlugin(ScrollTrigger)
 
 // ─── Styles ───────────────────────────────────────────────────────────────────
 
 const styles = {
-  wrapper: {
+  // Sticky floating layer: pins for 100vh, takes no horizontal flow space,
+  // and never intercepts pointer events so the section text below stays usable.
+  stickyLayer: {
     position: 'sticky',
     top: 0,
     width: '100%',
     height: '100vh',
     overflow: 'hidden',
+    pointerEvents: 'none',
+    zIndex: 5,
   },
   canvas: {
     position: 'absolute',
@@ -25,48 +23,12 @@ const styles = {
     width: '100%',
     height: '100%',
   },
-  overlays: {
-    position: 'absolute',
-    top: 0, left: 0, right: 0, bottom: 0,
-    pointerEvents: 'none',
-    zIndex: 10,
-  },
-  sec1: {
-    position: 'absolute',
-    top: 0, left: 0, right: 0, bottom: 0,
-    display: 'flex',
-    alignItems: 'center',
-    justifyContent: 'flex-end',
-    paddingRight: 'clamp(2rem, 6vw, 8rem)',
-    opacity: 0,
-    pointerEvents: 'none',
-    willChange: 'opacity',
-  },
-  sec2: {
-    position: 'absolute',
-    top: 0, left: 0, right: 0, bottom: 0,
-    display: 'flex',
-    alignItems: 'center',
-    justifyContent: 'flex-start',
-    paddingLeft: 'clamp(2rem, 6vw, 8rem)',
-    opacity: 0,
-    pointerEvents: 'none',
-    willChange: 'opacity',
-  },
   vignette: {
     position: 'absolute',
     top: 0, left: 0, right: 0, bottom: 0,
-    background: 'radial-gradient(ellipse at center, transparent 40%, rgba(0,0,0,0.55) 100%)',
+    background: 'radial-gradient(ellipse at center, transparent 45%, rgba(0,0,0,0.35) 100%)',
     pointerEvents: 'none',
     zIndex: 4,
-  },
-  fadeBottom: {
-    position: 'absolute',
-    bottom: 0, left: 0, right: 0,
-    height: '30vh',
-    background: 'linear-gradient(to bottom, transparent, #0a0a0a)',
-    pointerEvents: 'none',
-    zIndex: 5,
   },
 }
 
@@ -269,72 +231,19 @@ function Lights() {
   )
 }
 
-// ─── Section overlays ─────────────────────────────────────────────────────────
-//
-//  Section 1   fade in   p 0.15 → 0.25
-//              hold      p 0.25 → 0.50
-//              fade out  p 0.50 → 0.62
-//
-//  Section 2   fade in   p 0.62 → 0.74
-//              hold      p 0.74 → 1.00  (stays visible — never fades)
-
-function SectionOverlays({ progressRef, sec1Ref, sec2Ref }) {
-  useEffect(() => {
-    let rafId
-
-    const tick = () => {
-      const p = progressRef.current
-
-      if (sec1Ref.current) {
-        let o = p < 0.15  ? 0
-              : p <= 0.25 ? norm(p, 0.15, 0.25)
-              : p <= 0.50 ? 1
-              : p <= 0.62 ? 1 - norm(p, 0.50, 0.62)
-              : 0
-        o = clamp(o, 0, 1)
-        sec1Ref.current.style.opacity       = o
-        sec1Ref.current.style.pointerEvents = o > 0.05 ? 'auto' : 'none'
-      }
-
-      if (sec2Ref.current) {
-        let o = p < 0.62  ? 0
-              : p <= 0.74 ? norm(p, 0.62, 0.74)
-              : 1
-        o = clamp(o, 0, 1)
-        sec2Ref.current.style.opacity       = o
-        sec2Ref.current.style.pointerEvents = o > 0.05 ? 'auto' : 'none'
-      }
-
-      rafId = requestAnimationFrame(tick)
-    }
-
-    rafId = requestAnimationFrame(tick)
-    return () => cancelAnimationFrame(rafId)
-  }, [progressRef, sec1Ref, sec2Ref])
-
-  return null
-}
-
 // ─── Root ─────────────────────────────────────────────────────────────────────
 
 export default function BookScene() {
   const progressRef = useRef(0)
-  const sec1Ref     = useRef()
-  const sec2Ref     = useRef()
 
   useEffect(() => {
     const root = document.getElementById('book-scroll-root')
     if (!root) { console.error('[BookScene] #book-scroll-root not found'); return }
 
-    const st = ScrollTrigger.create({
-      trigger: '#book-scroll-root',
-      start:   'top top',
-      end:     'bottom bottom',
-      scrub:   true,
-      onUpdate: (self) => { progressRef.current = self.progress },
-    })
-
-    // Native fallback for zero-lag progress reads
+    // Book progress is derived directly from native scroll geometry.
+    // NOTE: we deliberately do NOT use a ScrollTrigger here. Hero pins for
+    // innerHeight*8, which fully consumes a #book-scroll-root ScrollTrigger's
+    // range (it reports a stuck progress=1). This native calc stays accurate.
     const onScroll = () => {
       const scrolled = window.scrollY - root.offsetTop
       const total    = root.offsetHeight - window.innerHeight
@@ -344,14 +253,16 @@ export default function BookScene() {
     onScroll()
 
     return () => {
-      st.kill()
       window.removeEventListener('scroll', onScroll)
     }
   }, [])
 
+  // Sticky floating book layer. It pins for 100vh at the top of
+  // #book-scroll-root and floats OVER the section content that follows
+  // in normal document flow. pointerEvents:none so the book never blocks
+  // interaction with the text beneath it.
   return (
-    <div style={styles.wrapper}>
-
+    <div style={styles.stickyLayer}>
       <Canvas
         style={styles.canvas}
         camera={{ position: [0, 0, 5], fov: 45 }}
@@ -365,23 +276,6 @@ export default function BookScene() {
       </Canvas>
 
       <div style={styles.vignette} />
-      <div style={styles.fadeBottom} />
-
-      <div style={styles.overlays}>
-        <div ref={sec1Ref} style={styles.sec1}>
-          <BookSection1 />
-        </div>
-        <div ref={sec2Ref} style={styles.sec2}>
-          <BookSection2 />
-        </div>
-      </div>
-
-      <SectionOverlays
-        progressRef={progressRef}
-        sec1Ref={sec1Ref}
-        sec2Ref={sec2Ref}
-      />
-
     </div>
   )
 }

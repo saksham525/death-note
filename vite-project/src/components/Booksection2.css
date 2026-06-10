@@ -39,8 +39,6 @@
     max-width: 900px;
     margin: 0 auto;
     padding: 0 5vw;
-    /* push content to the RIGHT so the book floats on the left */
-    padding-left: max(5vw, 50vw);
   }
   
   /* ─── Header ─────────────────────────────────────────────────────── */

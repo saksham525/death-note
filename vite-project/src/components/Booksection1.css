@@ -2,8 +2,10 @@
 .bs1-section {
     position: relative;
     width: 100%;
-    background: transparent; /* transparent so sticky canvas shows through */
-    padding: 10vh 0 14vh;
+    background: transparent; /* transparent so the floating book shows through */
+    /* extra top lead-in: lets the book drop in over empty space before the
+       first rule heading scrolls into view */
+    padding: 90vh 0 14vh;
     overflow: hidden;
   }
   
@@ -37,8 +39,6 @@
     max-width: 900px;
     margin: 0 auto;
     padding: 0 5vw;
-    /* push content to the RIGHT so the book floats on the left */
-    padding-left: max(5vw, 50vw);
   }
   
   /* ─── Header ─────────────────────────────────────────────────────── */
